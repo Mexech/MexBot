@@ -6,17 +6,17 @@ let bot = Sword(token: "MzQwOTAyMjY1OTE1NDQxMTYz.DGCyiw.MigJWkxAIwwRPNRsIAYdoXMk
 bot.on(.ready) { [unowned bot] _ in
   bot.editStatus(to: "online", playing: "with Sword!")
   bot.on(.guildAvailable) { data in
-    let guild = data as! Guild
-    let channels = guild.channels
+    var guild = data as! Guild
+    var channels = guild.channels
 
     let afkChannelId : ChannelID = 206331096864915456
     let hubChannelId : ChannelID = 327485826579824641
+    var newlyCreatedChannelId : ChannelID? = nil
 
-    /*func findChannelByName(_ name : String) -> ChannelID{
-      for (channelID, channel) in channels{
-        if channel.name == name {return channelID}
-      }
-    }*/
+    bot.on(.channelDelete) { data in
+      let channel = data as! GuildChannel
+      channels.removeValue(forKey: channel.id)
+    }
 
     //mover
     bot.on(.presenceUpdate) { data in
@@ -27,20 +27,34 @@ bot.on(.ready) { [unowned bot] _ in
       if game != nil{
         for (voiceUserID, voiceState) in voiceStates{
           if voiceUserID == userID && voiceState.channelId != afkChannelId {
+            var foundChannel : Bool = false
             for (channelID, channel) in channels {
               if channel.name == game {
                 guild.moveMember(userID, to: channelID)
+                foundChannel = true
                 break
-              }/*else{
-                guild.createChannel(with : ["type" : 2,"name" : game!])
-                guild.moveMember(userID, to : findChannelByName(game!))
-                break
-              }*/
+              }
+            }
+            print(foundChannel)
+            if foundChannel{
+              break
+            }else{
+              guild.createChannel(with : ["type" : 2, "name" : game!]){ data, error in
+                let channel = data as! GuildChannel
+                channels[channel.id] = channel
+                newlyCreatedChannelId = channel.id
+                guild.moveMember(userID, to : channel.id)
+              }
+              break
             }
           }
         }
       }else{
-      guild.moveMember(userID, to: hubChannelId)
+        guild.moveMember(userID, to: hubChannelId)
+        if newlyCreatedChannelId != nil {
+        channels.removeValue(forKey: newlyCreatedChannelId!)
+        bot.deleteChannel(newlyCreatedChannelId!)
+        }
       }
     }
   }
